@@ -124,7 +124,7 @@
                                 },
                                 
                                 series: [{
-                                         name: 'Relative Humidity',
+                                         name: 'Relative Humidity %',
 										 type: 'line',
                                          marker: {
                                          radius: 2
@@ -148,7 +148,8 @@
                                            var date,
                                            
                                            // set up the two data series
-                                           humidityTemperatureLevels = [];
+                                           humidityLevels = [];
+										   temperature = [];
                                            
                                            // inconsistency
                                            if (typeof csv !== 'string') {
@@ -163,15 +164,20 @@
                                                        line = line.split(',');
                                                        date = parseInt(line[0], 10)*1000;
                                                        
-                                                       humidityTemperatureLevels.push([
+                                                       humidityLevels.push([
                                                                          date,
-                                                                         parseInt(line[1], 10),
-																		 parseInt(line[2], 10)
+                                                                         parseInt(line[1], 10)
                                                                          ]);
+													   temperature.push([
+																		date,
+																		parseInt(line[2], 10)
+																		]);
+																		 
                                                        
                                                        });
                                            
-                                           options.series[0].data = humidityTemperatureLevels;
+                                           options.series[0].data = humidityLevels;
+										   options.series[1].data = temperature;
 
                                            chart = new Highcharts.Chart(options);
                                            });
