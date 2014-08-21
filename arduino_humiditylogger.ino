@@ -291,13 +291,17 @@ void sampleSensorTask()
       }
      
       float temperature = getTemperature(T_SENSOR);
-      Serial.print("temperature=");
-      Serial.println(temperature);
       
       char dataString[25] = "";
       //get the values and setup the string we want to write to the file
       float relativeHumidity  = getHumidity(temperature);
-       
+ 
+      Serial.print(" temperature = ");
+      Serial.println(temperature);
+      Serial.print(" °C, Relative humidity = ");
+      Serial.print(relativeHumidity);
+      Serial.println(" %");
+      
       char tempStr[12];
   
       ultoa(ntpTime,tempStr,10);        
