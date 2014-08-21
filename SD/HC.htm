@@ -59,7 +59,7 @@
 								
                                 yAxis: {
                                 title: {
-                                text: 'Relative Humidity Levels (0 - 100)'
+                                text: 'Sensor reading (0 - 100)'
                                 },
                                 min: 0,
 								//max: 100,
@@ -71,6 +71,7 @@
                                 enabled: true,
                                 align: 'right',
                                 verticalAlign: 'middle',
+								layout: 'vertical',
                                 borderWidth: 0
                                 },
                                 
@@ -123,11 +124,20 @@
                                 },
                                 
                                 series: [{
-                                         name: 'Relative Humidity Levels',
+                                         name: 'Relative Humidity',
+										 type: 'line',
                                          marker: {
                                          radius: 2
                                          }
-                                         }]
+                                         },
+										 {
+										 name: 'Temperature in °C',
+										 type: 'line',
+										 color: '#FF00FF',
+										 marker: {
+										 radius: 2
+										 }
+										 }]
                                 };
                                 
                                 
@@ -138,7 +148,7 @@
                                            var date,
                                            
                                            // set up the two data series
-                                           humidityLevels = [];
+                                           humidityTemperatureLevels = [];
                                            
                                            // inconsistency
                                            if (typeof csv !== 'string') {
@@ -153,14 +163,15 @@
                                                        line = line.split(',');
                                                        date = parseInt(line[0], 10)*1000;
                                                        
-                                                       humidityLevels.push([
+                                                       humidityTemperatureLevels.push([
                                                                          date,
-                                                                         parseInt(line[1], 10)
+                                                                         parseInt(line[1], 10),
+																		 parseInt(line[2], 10)
                                                                          ]);
                                                        
                                                        });
                                            
-                                           options.series[0].data = humidityLevels;
+                                           options.series[0].data = humidityTemperatureLevels;
 
                                            chart = new Highcharts.Chart(options);
                                            });
