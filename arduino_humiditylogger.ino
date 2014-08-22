@@ -12,7 +12,7 @@
 #include "serverTask.h"
 
 /*** DATA LOGGER AND TIMER CONTROLS ****/
-#define HIH4030_Pin  0
+#define HIH4030_Pin  A0
 #define MEASURE_INTERVAL 600000     //10 minute intervals between measurements (in ms)
 #define FILE_INTERVAL 604800        //One week worth of seconds
 

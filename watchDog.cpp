@@ -31,7 +31,7 @@ ISR(WDT_vect) // Watchdog timer interrupt.
 // prevent a reset.
 }
 
-void watchDog_reset(void)
+ void watchDog_reset(void)
 {
   wdt_reset(); 
 }
