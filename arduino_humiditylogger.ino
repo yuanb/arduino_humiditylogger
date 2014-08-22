@@ -81,7 +81,6 @@ void setup() {
   IPAddress ip(192,168,0,177);
   unsigned int localPort = 8888;          // local port to listen for UDP packets  
   
-
   // Open serial communications and wait for port to open:
   Serial.begin(9600);
   
@@ -243,9 +242,27 @@ void generateNewFilename(unsigned long rawTime)
   EEPROM_writeAnything(0, config);  
 }
 
+// From Making accurate ADC readings on the Arduino
+// http://hacking.majenko.co.uk/making-accurate-adc-readings-on-arduino
+long readVcc() {
+  long result;
+  // Read 1.1V reference against AVcc
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  delay(2); // Wait for Vref to settle
+  ADCSRA |= _BV(ADSC); // Convert
+  while (bit_is_set(ADCSRA,ADSC));
+  result = ADCL;
+  result |= ADCH<<8;
+  result = 1125300L / result; // Back-calculate AVcc in mV
+  return result;
+}
+
 float getHumidity(float degreesCelsius){
   //caculate relative humidity
-  float supplyVolt = 4.7;
+  float supplyVolt = readVcc()/1000.0;
+  
+  //Serial.print(F("Vcc= "));
+  //Serial.println(supplyVolt);
 
   // read the value from the sensor:
   int HIH4030_Value = analogRead(HIH4030_Pin);
@@ -268,7 +285,7 @@ void sampleSensorTask()
   if ((millis() % lastIntervalTime) >= MEASURE_INTERVAL)    //Is it time for a new measurement?
   {
     Serial.print(F("freeRam @ sampleSensor()="));
-    Serial.print(freeRam());  
+    Serial.println(freeRam());  
 
     static int count = 0;
  
@@ -296,11 +313,11 @@ void sampleSensorTask()
       //get the values and setup the string we want to write to the file
       float relativeHumidity  = getHumidity(temperature);
  
-      Serial.print(" temperature = ");
-      Serial.println(temperature);
-      Serial.print(" °C, Relative humidity = ");
+      Serial.print(F("temperature = "));
+      Serial.print(temperature);
+      Serial.print(F(" C, Relative humidity = "));
       Serial.print(relativeHumidity);
-      Serial.println(" %");
+      Serial.println(F(" %"));
       
       char tempStr[12];
   
