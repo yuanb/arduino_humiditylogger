@@ -1,12 +1,15 @@
 #include <SD.h>
 #include <SPI.h>
-#include <Ethernet.h>
 #include <Time.h>
-//#include <Timezone.h>
+#include <Ethernet.h>
 #include <EEPROM.h>
 #include <OneWire.h>
-#include <avr/wdt.h>
+
 #include "EEPROMAnything.h"
+#include "freeram.h"
+#include "watchDog.h"
+#include "ntpTask.h"
+#include "serverTask.h"
 
 /*** DATA LOGGER AND TIMER CONTROLS ****/
 #define HIH4030_Pin  0
@@ -20,70 +23,15 @@ typedef struct{
 } configuration;
 configuration config;               //Actually make our config struct
 
-#define NTP_PACKET_SIZE   48
-#define  eStateTimeRead   0
-#define  eStateNTPSent    1
-unsigned long ntpTime = 0;
-
-EthernetServer server(80);
-EthernetUDP Udp;
-
 OneWire  ONE_WIRE_BUS(2);  // Bus One-Wire (sonda DS18S20) sul pin 10
 
 // Indirizzo della sonda DS18S20
 // Nota: trova l'indirizzo della tua sonda col programma precedente e incollalo al posto di questo
 byte T_SENSOR[8] = {0x10, 0x8F, 0x43, 0x37, 0x00, 0x08, 0x00, 0x2A};
 
-int freeRam () 
-{
-  extern int __heap_start, *__brkval; 
-  int v; 
-  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
-}
-
-//Arduino watchdog
-//http://forum.arduino.cc/index.php?PHPSESSID=ca9vdgoaf8au01thde4locivn5&action=dlattach;topic=63651.0;attach=3585
-//https://www.youtube.com/watch?v=BDsu8YhYn8g
-void watchdogSetup(void)
-{
-  cli();          // disable all interrupts
-  wdt_reset();    // reset the WDT timer
-  /*
-  WDTCSR configuration:
-  WDIE = 1: Interrupt Enable
-  WDE = 1 :Reset Enable
-  WDP3 = 0 :For 2000ms Time-out
-  WDP2 = 1 :For 2000ms Time-out
-  WDP1 = 1 :For 2000ms Time-out
-  WDP0 = 1 :For 2000ms Time-out
-  */
-  // Enter Watchdog Configuration mode:
-  WDTCSR |= (1<<WDCE) | (1<<WDE);
-  // Set Watchdog settings:
-  WDTCSR = (1<<WDIE) | (1<<WDE) | (0<<WDP3) | (1<<WDP2) | (1<<WDP1) | (1<<WDP0);
-  sei();
-}
-
-ISR(WDT_vect) // Watchdog timer interrupt.
-{
-// Include your code here - be careful not to use functions they may cause the interrupt to hang and
-// prevent a reset.
-}
-
-void setup() {  
-  // Initialize the Ethernet server library
-  // with the IP address and port you want to use 
-  // (port 80 is default for HTTP):
-
-  // Enter a MAC address and IP address for your controller below.
-  // The IP address will be dependent on your local network:
-  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-  IPAddress ip(192,168,0,177);
-  unsigned int localPort = 8888;          // local port to listen for UDP packets  
-  
+void setup() {    
   // Open serial communications and wait for port to open:
   Serial.begin(9600);
-  
   while (!Serial) {
     ; // wait for serial port to connect. Needed for Leonardo only
   }
@@ -98,10 +46,8 @@ void setup() {
     return;
   }
 
-  // start the Ethernet connection and the server:
-  Ethernet.begin(mac, ip);
-  server.begin();
-  Udp.begin(localPort);
+  serverInit();
+  ntpInit();
   
   EEPROM_readAnything(0,config); // make sure our config struct is syncd with EEPROM
 
@@ -109,93 +55,12 @@ void setup() {
   Serial.println(F("setup done."));
 }
 
-// A function that takes care of the listing of files for the
-// main page one sees when they first connect to the arduino.
-// it only lists the files in the /data/ folder. Make sure this
-// exists on your SD card.
-void ListFiles(EthernetClient client) {
-
-	File workingDir = SD.open("/data");
-
-	client.println("<ul>");
-
-	while (true) {
-		File entry = workingDir.openNextFile();
-		if (!entry) {
-			break;
-		}
-		client.print("<li><a href=\"/HC.htm?file=");
-		client.print(entry.name());
-		client.print("\">");
-		client.print(entry.name());
-		client.println("</a></li>");
-		entry.close();
-	}
-	client.println("</ul>");
-	workingDir.close();
-}
-
-// A function to get the Ntp Time. This is used to make sure that the data
-// points recorded by the arduino are referenced to some meaningful time
-// which in our case is UTC represented as unix time (choosen because it 
-// works simply with highcharts without too much unecessary computation).
-
-unsigned long getNtpTime(byte* packetBuffer)
+void loop()
 {
-  unsigned long ret = 0;
-
-  if ( Udp.parsePacket() ) {  
-    // We've received a packet, read the data from it
-    Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read the packet into the buffer
- 
-    //the timestamp starts at byte 40 of the received packet and is four bytes,
-    // or two words, long. First, esxtract the two words:
- 
-    unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
-    unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);  
-    // combine the four bytes (two words) into a long integer
-    // this is NTP time (seconds since Jan 1 1900):
-    unsigned long secsSince1900 = highWord << 16 | lowWord;  
-    // Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
-    const unsigned long seventyYears = 2208988800UL;     
-    // subtract seventy years:
-    unsigned long epoch = secsSince1900 - seventyYears;  
-    
-    //time_t eastern;
-    //TimeChangeRule usEDT = {"EDT", Second, Sun, Mar, 2, -240};  //UTC - 4 hours
-    //TimeChangeRule usEST = {"EST", First, Sun, Nov, 2, -300};   //UTC - 5 hours
-    //Timezone usEastern(usEDT, usEST);
-    
-    // return Unix time:
-    //ret = usEastern.toLocal(epoch);
-    ret = epoch;
-  }
-  return ret;  
-}
-
-// send an NTP request to the time server at the given address,
-// necessary for getTime().
-void sendNTPpacket(IPAddress& address, byte* packetBuffer)
-{
-  // set all bytes in the buffer to 0
-  memset(packetBuffer, 0, NTP_PACKET_SIZE); 
-  // Initialize values needed to form NTP request
-  // (see URL above for details on the packets)
-  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
-  packetBuffer[1] = 0;     // Stratum, or type of clock
-  packetBuffer[2] = 6;     // Polling Interval
-  packetBuffer[3] = 0xEC;  // Peer Clock Precision
-  // 8 bytes of zero for Root Delay & Root Dispersion
-  packetBuffer[12]  = 49; 
-  packetBuffer[13]  = 0x4E;
-  packetBuffer[14]  = 49;
-  packetBuffer[15]  = 52;
- 
-  // all NTP fields have been given values, now
-  // you can send a packet requesting a timestamp:         
-  Udp.beginPacket(address, 123); //NTP requests are to port 123
-  Udp.write(packetBuffer,NTP_PACKET_SIZE);
-  Udp.endPacket();
+  updateTimeTask();
+  sampleSensorTask();
+  serveClientTask();
+  idleTask();
 }
 
 void generateNewFilename(unsigned long rawTime)
@@ -352,138 +217,12 @@ void sampleSensorTask()
   }
 }
 
-void serveClientTask()
-{
-// How big our line buffer should be for sending the files over the ethernet.
-// 75 has worked fine for me so far.
-#define BUFSIZ 75
-  char clientline[75];
-
-   // listen for incoming clients
-   EthernetClient client = server.available();
-   if (client)
-   {
-      Serial.print(F("freeRam @ serveClient()="));
-      Serial.println(freeRam());         
-
-      // reset the input buffer
-      int index = 0;
-
-      while (client.connected())
-      {
-        if (client.available())
-        {
-          char c = client.read();
-          
-          // If it isn't a new line, add the character to the buffer
-          if (c != '\n' && c != '\r')
-          {
-            clientline[index] = c;
-            index++;
-            
-            // are we too big for the buffer? start tossing out data
-            if (index >= BUFSIZ) 
-              index = BUFSIZ -1;
-              
-              // continue to read more data!
-              continue;
-          }
-         
-          // got a \n or \r new line, which means the string is done
-          clientline[index] = 0;
-         
-          // Print it out for debugging
-          Serial.println(clientline);
-        
-          // Look for substring such as a request to get the root file
-          if (strstr(clientline, "GET / ") != 0)
-          {
-             client.println(F("HTTP/1.1 200 OK"));
-             client.println(F("Content-Type: text/html"));
-             client.println();
-             client.println(F("<h2>View data for the week of (dd-mm-yy):</h2>"));
-             ListFiles(client);
-          }
-          else if (strstr(clientline, "GET /") != 0)
-          {            
-            // this time no space after the /, so a sub-file!
-            char *filename;
-            
-            filename = strtok(clientline + 5, "?"); // look after the "GET /" (5 chars) but before
-            // the "?" if a data file has been specified. A little trick, look for the " HTTP/1.1"
-            // string and turn the first character of the substring into a 0 to clear it out.
-            (strstr(clientline, " HTTP"))[0] = 0;
-            
-            File file = SD.open(filename,FILE_READ);
-            if (!file)
-            {
-              client.println(F("HTTP/1.1 404 Not Found"));
-              client.println(F("Content-Type: text/html"));
-              client.println();
-              break;
-            }
-
-            client.println(F("HTTP/1.1 200 OK"));
-            client.println(F("Content-Type: text/html"));
-            client.println(F("Connection: close"));
-            client.println();
-            
-            while(file.available()) {
-              client.write(file.read());
-            }
-            
-            //int16_t c;
-            //while ((c = file.read()) > 0)
-            //{
-
-            //  client.print((char)c);
-            // }
-            file.close();
-          }
-          else
-          {
-            // everything else is a 404
-            client.println(F("HTTP/1.1 404 Not Found"));
-            client.println(F("Content-Type: text/html"));
-            client.println();
-            client.println(F("<h2>File Not Found!</h2>"));
-          }
-          break;
-        }
-     }
-    
-     // give the web browser time to receive the data
-    delay(1);
-    // close the connection:
-    client.stop();
-  }
-}
-
-void updateTimeTask()
-{
-  static byte eState = eStateTimeRead;
-  static unsigned long taskMillis = 0;
-  byte packetBuffer[NTP_PACKET_SIZE];
-  
-  if (eState == eStateTimeRead && ((taskMillis == 0) || (millis() - taskMillis) >= 1000*20) ) {
-    IPAddress timeServer(132, 163, 4, 101); //NIST time server IP address: for more info
-                                            //see http://tf.nist.gov/tf-cgi/servers.cgi
-    sendNTPpacket(timeServer, packetBuffer); // send an NTP packet to a time server
-    eState = eStateNTPSent;
-    taskMillis = millis();
-  } else if (eState == eStateNTPSent && (millis() - taskMillis) >= 1000 ) {
-    ntpTime = getNtpTime(packetBuffer);
-    eState = eStateTimeRead;
-    taskMillis = millis();
-  }
-}
-
 void writeTimeToScratchpad(byte* address)
 {
   ONE_WIRE_BUS.reset();          // Reset 1 wire bus
   ONE_WIRE_BUS.select(address);  // Select DS1820 sensor
   ONE_WIRE_BUS.write(0x44,1);    // Richiamo la funzione di conversione temperatura (44h)
-  delay(1000);
+  delay(250);
 }
  
 void readTimeFromScratchpad(byte* address, byte* data)
@@ -525,14 +264,6 @@ float getTemperature(byte* address)
 
 void idleTask()
 {
-  wdt_reset(); 
-}
-
-void loop()
-{
-  updateTimeTask();
-  sampleSensorTask();
-  serveClientTask();
-  idleTask();
+  watchDog_reset();
 }
 
