@@ -1,16 +1,18 @@
 #include <SD.h>
-#include <Dhcp.h>
-#include <Dns.h>
 #include <Ethernet.h>
-#include <EthernetClient.h>
 #include <EthernetServer.h>
-#include <EthernetUdp.h>
 #include <util.h>
 
 #include "serverTask.h"
 #include "freeram.h"
+#include "watchDog.h"
 
 EthernetServer server(80);
+
+// Enter a MAC address and IP address for your controller below.
+// The IP address will be dependent on your local network:
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+IPAddress ip(192,168,0,177);
 
 void serverInit(void)
 {
@@ -18,14 +20,30 @@ void serverInit(void)
   // with the IP address and port you want to use 
   // (port 80 is default for HTTP):
 
-  // Enter a MAC address and IP address for your controller below.
-  // The IP address will be dependent on your local network:
-  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-  IPAddress ip(192,168,0,177);
   
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
   server.begin();
+}
+
+void sendClientConnectionClose(EthernetClient &client)
+{
+  client.println(F("Content-Type: text/html"));
+  client.println(F("Connection: close"));  
+}
+
+void sendClientOK(EthernetClient &client)
+{
+  client.println(F("HTTP/1.1 200 OK"));
+  sendClientConnectionClose(client);
+  client.println();
+}
+
+void sendClient404(EthernetClient &client)
+{
+  client.println(F("HTTP/1.1 404 Not Found"));
+  sendClientConnectionClose(client); 
+  client.println(F("<h2>File Not Found!</h2>"));  
 }
 
 void serveClientTask(void)
@@ -40,7 +58,7 @@ void serveClientTask(void)
    if (client)
    {
       Serial.print(F("freeRam @ serveClient()="));
-      Serial.println(freeRam());         
+      Serial.println(freeRam());
 
       // reset the input buffer
       int index = 0;
@@ -74,9 +92,7 @@ void serveClientTask(void)
           // Look for substring such as a request to get the root file
           if (strstr(clientline, "GET / ") != 0)
           {
-             client.println(F("HTTP/1.1 200 OK"));
-             client.println(F("Content-Type: text/html"));
-             client.println();
+             sendClientOK(client);
              client.println(F("<h2>View data for the week of (dd-mm-yy):</h2>"));
              ListFiles(client);
           }
@@ -93,36 +109,32 @@ void serveClientTask(void)
             File file = SD.open(filename,FILE_READ);
             if (!file)
             {
-              client.println(F("HTTP/1.1 404 Not Found"));
-              client.println(F("Content-Type: text/html"));
-              client.println();
+              sendClient404(client);
               break;
             }
 
-            client.println(F("HTTP/1.1 200 OK"));
-            client.println(F("Content-Type: text/html"));
-            client.println(F("Connection: close"));
-            client.println();
+            sendClientOK(client);
+#if  1
+            Serial.print(F("freeRam before sending file="));
+            Serial.println(freeRam());
             
             while(file.available()) {
               client.write(file.read());
             }
-            
-            //int16_t c;
-            //while ((c = file.read()) > 0)
-            //{
-
-            //  client.print((char)c);
-            // }
+#else            
+            int16_t c;
+            watchDog_reset();
+            while ((c = file.read()) > 0)
+            {
+              client.print((char)c);
+            }
+#endif
             file.close();
           }
           else
           {
             // everything else is a 404
-            client.println(F("HTTP/1.1 404 Not Found"));
-            client.println(F("Content-Type: text/html"));
-            client.println();
-            client.println(F("<h2>File Not Found!</h2>"));
+            sendClient404(client);
           }
           break;
         }
@@ -135,31 +147,30 @@ void serveClientTask(void)
   }
 }
 
-
 // A function that takes care of the listing of files for the
 // main page one sees when they first connect to the arduino.
 // it only lists the files in the /data/ folder. Make sure this
 // exists on your SD card.
 void ListFiles(EthernetClient client)
 {
+  File workingDir = SD.open("/data");
+  client.println(F("<ul>"));
 
-	File workingDir = SD.open("/data");
-
-	client.println("<ul>");
-
-	while (true) {
-		File entry = workingDir.openNextFile();
-		if (!entry) {
-			break;
-		}
-		client.print("<li><a href=\"/HC.htm?file=");
-		client.print(entry.name());
-		client.print("\">");
-		client.print(entry.name());
-		client.println("</a></li>");
-		entry.close();
-	}
-	client.println("</ul>");
-	workingDir.close();
+  while (true)
+  {
+    File entry = workingDir.openNextFile();
+    if (!entry)
+    {
+      break;
+    }
+    client.print(F("<li><a href=\"/HC.htm?file="));
+    client.print(entry.name());
+    client.print(F("\">"));
+    client.print(entry.name());
+    client.println(F("</a></li>"));
+    entry.close();
+  }
+  client.println(F("</ul>"));
+  workingDir.close();
 }
 

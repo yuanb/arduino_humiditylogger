@@ -1,6 +1,8 @@
 #ifndef  _NTPTask_H
 #define  _NTPTASK_H
 
+#include <Ethernet.h>
+
 #define NTP_PACKET_SIZE   48
 #define  eStateTimeRead   0
 #define  eStateNTPSent    1

@@ -1,6 +1,3 @@
-#include <Dhcp.h>
-#include <Dns.h>
-#include <Ethernet.h>
 #include <EthernetClient.h>
 #include <EthernetServer.h>
 #include <EthernetUdp.h>
@@ -84,17 +81,21 @@ void updateTimeTask()
   static byte eState = eStateTimeRead;
   static unsigned long taskMillis = 0;
   byte packetBuffer[NTP_PACKET_SIZE];
+  unsigned long currentMillis = millis();
   
-  if (eState == eStateTimeRead && ((taskMillis == 0) || (millis() - taskMillis) >= 1000*20) ) {
+  if (eState == eStateTimeRead && ((taskMillis == 0) || (currentMillis - taskMillis) >= 1000*20) )
+  {
     IPAddress timeServer(132, 163, 4, 101); //NIST time server IP address: for more info
                                             //see http://tf.nist.gov/tf-cgi/servers.cgi
     sendNTPpacket(timeServer, packetBuffer); // send an NTP packet to a time server
     eState = eStateNTPSent;
-    taskMillis = millis();
-  } else if (eState == eStateNTPSent && (millis() - taskMillis) >= 1000 ) {
+    taskMillis = currentMillis;
+  }
+  else if (eState == eStateNTPSent && (currentMillis - taskMillis) >= 1000 )
+  {
     ntpTime = getNtpTime(packetBuffer);
     eState = eStateTimeRead;
-    taskMillis = millis();
+    taskMillis = currentMillis;
   }
 }
 

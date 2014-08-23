@@ -1,4 +1,5 @@
 <!DOCTYPE HTML>
+<!-- http://localhost/HC.htm?file=18-08-14.CSV -->
 <html>
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -41,9 +42,8 @@
                                 zoomType: 'x',
                                 spacingRight: 20,
 								shadow: true,
-								type: 'line'
+								type: 'spline'
                                 },
-                                
                                 title: {
                                 text: 'Humidity levels recorded by Arduino'
                                 },
@@ -54,7 +54,11 @@
                                 
                                 xAxis: {
                                 type: 'datetime',
-                                maxZoom: 2 * 3600000
+								dateTimeLabelFormats : {
+									hour: '%I:%M %P',
+									minute: '%I %M'
+								},
+                                maxZoom: 2 * 3600000,
                                 },
 								
                                 yAxis: {
@@ -62,9 +66,20 @@
                                 text: 'Sensor reading (0 - 100)'
                                 },
                                 min: 0,
-								//max: 100,
+								max: 100,
                                 startOnTick: false,
-                                showFirstLabel: false
+                                showFirstLabel: false,
+								gridLineColor: '#8AB8E6',
+								alternateGridColor: {
+									linearGradient: {
+									x1: 0, y1: 1,
+									x2: 1, y2: 1
+								},
+									stops: [ [0, '#FAFCFF' ],
+									[0.5, '#F5FAFF'] ,
+									[0.8, '#E0F0FF'] ,
+									[1, '#D6EBFF'] ]
+									}								
                                 },
                                 
                                 legend: {
@@ -98,9 +113,6 @@
                                 },
 								
                                 plotOptions: {
-								line: {
-								  animation: true,
-                                },
                                 series: {
                                 cursor: 'pointer',
                                 lineWidth: 1.0,
@@ -113,8 +125,7 @@
                                               y: this.pageY
                                               },
                                               headingText: this.series.name,
-                                              maincontentText: Highcharts.dateFormat('%H:%M - %b %e, %Y', this.x) +':<br/> '+
-                                              this.y,
+                                              maincontentText: Highcharts.dateFormat('%H:%M - %b %e, %Y', this.x) +':<br/> ',
                                               width: 200
                                               });
                                 }
@@ -125,18 +136,16 @@
                                 
                                 series: [{
                                          name: 'Relative Humidity %',
-										 type: 'line',
                                          marker: {
-                                         radius: 2
-                                         }
+											radius: 2
+                                         },
                                          },
 										 {
-										 name: 'Temperature in °C',
-										 type: 'line',
+										 name: 'Temperature in C',
 										 color: '#FF00FF',
 										 marker: {
-										 radius: 2
-										 }
+											radius: 2
+										 },
 										 }]
                                 };
                                 
@@ -145,11 +154,11 @@
                                 // to the options and initiate the chart.
                                 // http://api.jquery.com/jQuery.get/
                                 jQuery.get(dataFilePath, null, function(csv, state, xhr) {
-                                           var date,
+                                           var date, humidity, temperature, 
                                            
                                            // set up the two data series
                                            humidityLevels = [];
-										   temperature = [];
+										   temperatureLevels = [];
                                            
                                            // inconsistency
                                            if (typeof csv !== 'string') {
@@ -160,29 +169,72 @@
                                            csv = csv.split(/\n/g);
                                            jQuery.each(csv, function(i, line) {
                                                        
+													   if (line.length == 0) {
+														  return true;
+													   }
                                                        // all data lines start with a double quote
                                                        line = line.split(',');
                                                        date = parseInt(line[0], 10)*1000;
-                                                       
-                                                       humidityLevels.push([
-                                                                         date,
-                                                                         parseInt(line[1], 10)
-                                                                         ]);
-													   temperature.push([
-																		date,
-																		parseInt(line[2], 10)
-																		]);
-																		 
-                                                       
+													   humidity  = parseInt(line[1], 10);
+													   temperature = parseInt(line[2], 10);
+													   //filter
+													      if (humidity >=0 && humidity <= 100 ) {
+														   humidityLevels.push([
+																			 date,
+																			 humidity
+																			 ]);
+														  }
+														  if (temperature>=-20 && temperature <=80 ) {
+														   temperatureLevels.push([
+																			date,
+																			temperature
+																			]);
+														  }
                                                        });
                                            
                                            options.series[0].data = humidityLevels;
-										   options.series[1].data = temperature;
+										   options.series[1].data = temperatureLevels;
 
                                            chart = new Highcharts.Chart(options);
                                            });
                                 });
-              
+    $('#chart-B').highcharts({
+        chart: {
+            type: 'line'
+        },
+        title: {
+            text: 'Chart B'
+        },
+        xAxis: {
+			type: 'datetime',
+			dateTimeLabelFormats : {
+				hour: '%I:%M %P',
+				minute: '%I %M'
+			},
+        },
+        yAxis: {
+            min: 0,
+            title: {
+                text: 'Miles during Run'
+            }
+        },
+        legend: {
+            enabled: false
+        },
+        credits: {
+            enabled: true,
+            text: 'You can have a link in here too',
+            href: 'http://www.google.com'
+        },
+        tooltip: {
+            shared: true
+        },
+        series: [{
+            name: 'Miles',
+            data: [2.4, 3.8, 6.1, 5.3, 4.1]
+            
+        }]
+    });								
               });
                 </script>
             </head>
@@ -197,7 +249,9 @@
         <script type="text/javascript" src="http://www.highcharts.com/highslide/highslide.config.js" charset="utf-8"></script>
         <link rel="stylesheet" type="text/css" href="http://www.highcharts.com/highslide/highslide.css" />
         
-        <div id="container" style="min-width: 400px; height: 400px; margin: 0 auto"></div>
+        <div id="container" style="min-width: 400px; max-width:1440px; height: 400px; margin: 0 auto"></div>
+		<div class="spacer"></div>
+		<div id="chart-B" class="chart" style="min-width: 400px; max-width: 400px;; height: 400px; margin: 0 align="left" ></div> 
         
     </body>
 </html>
