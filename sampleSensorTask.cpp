@@ -173,6 +173,28 @@ void sampleSensorTask()
         Serial.println(F("Error opening datafile."));
       }
       
+      if ( SD.exists("current.jso") )
+      {
+        SD.remove("current.jso");
+      }
+      
+      File currentFile = SD.open("current.jso", FILE_WRITE);
+      if (currentFile) {
+        currentFile.println(F("{"));
+        currentFile.print(F("\t\"currentHumidity\": "));
+        dtostrf(relativeHumidity,6, 2, tempStr);
+        currentFile.print(tempStr);
+        currentFile.println(F(","));
+        currentFile.print(F("\t\"currentTemperature\": "));
+        dtostrf(temperature,6, 2, tempStr);
+        currentFile.println(tempStr);
+        currentFile.println(F("}"));
+        currentFile.close();
+      }
+      else {
+        Serial.println(F("Error writting current.jso file."));
+      }
+      
       //Update the time of the last measurment to the current timer value
       lastIntervalTime = millis();  
     }

@@ -105,7 +105,7 @@ void serveClientTask(void)
             // the "?" if a data file has been specified. A little trick, look for the " HTTP/1.1"
             // string and turn the first character of the substring into a 0 to clear it out.
             (strstr(clientline, " HTTP"))[0] = 0;
-            
+
             File file = SD.open(filename,FILE_READ);
             if (!file)
             {

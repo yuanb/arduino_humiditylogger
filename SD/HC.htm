@@ -1,257 +1,32 @@
 <!DOCTYPE HTML>
 <!-- http://localhost/HC.htm?file=18-08-14.CSV -->
 <html>
-    <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-            <title>Arduino Humidity Data Logger!</title>
 
-            <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
-            <script type="text/javascript">
-                function getDataFilename(str){
-                    point = str.lastIndexOf("file=")+4;
-                    
-                    tempString = str.substring(point+1,str.length)
-                    if (tempString.indexOf("&") == -1){
-                        return(tempString);
-                    }
-                    else{
-                        return tempString.substring(0,tempString.indexOf("&"));
-                    }
-                    
-                }
-            
-            query  = window.location.search;
-            
-            var dataFilePath = "/data/"+getDataFilename(query);
-            
-            $(function () {
-              var chart;
-              Highcharts.setOptions({
-                  global: {
-                     timezoneOffset: 4 * 60
-                  }
-               });
-			   
-              $(document).ready(function() {
-                                
-                                // define the options
-                                var options = {
-                                
-                                chart: {
-                                renderTo: 'container',
-                                zoomType: 'x',
-                                spacingRight: 20,
-								shadow: true,
-								type: 'spline'
-                                },
-                                title: {
-                                text: 'Humidity levels recorded by Arduino'
-                                },
-                                
-                                subtitle: {
-                                text: 'Click and drag in the plot area to zoom in'
-                                },
-                                
-                                xAxis: {
-                                type: 'datetime',
-								dateTimeLabelFormats : {
-									hour: '%I:%M %P',
-									minute: '%I %M'
-								},
-                                maxZoom: 2 * 3600000,
-                                },
-								
-                                yAxis: {
-                                title: {
-                                text: 'Sensor reading (0 - 100)'
-                                },
-                                min: 0,
-								max: 100,
-                                startOnTick: false,
-                                showFirstLabel: false,
-								gridLineColor: '#8AB8E6',
-								alternateGridColor: {
-									linearGradient: {
-									x1: 0, y1: 1,
-									x2: 1, y2: 1
-								},
-									stops: [ [0, '#FAFCFF' ],
-									[0.5, '#F5FAFF'] ,
-									[0.8, '#E0F0FF'] ,
-									[1, '#D6EBFF'] ]
-									}								
-                                },
-                                
-                                legend: {
-                                enabled: true,
-                                align: 'right',
-                                verticalAlign: 'middle',
-								layout: 'vertical',
-                                borderWidth: 0
-                                },
-                                
-								credits:{
-                                  enabled: true,  
-                                  position: {
-                                  align: 'right',  
-                                  x: -10,  
-                                  y: -10  
-                                  },  
-                                  href: "https://github.com/yuanb/arduino_humiditylogger",
-                                  style: {  
-                                    color:'blue'  
-                                  },  
-                                  text: "Arduino humidity logger"
-                                },
-								
-                                tooltip: {
-                                valueSuffix: '%',
-                                formatter: function() {
-                                return '<b>'+ this.series.name +'</b><br/>'+
-                                Highcharts.dateFormat('%H:%M - %b %e, %Y', this.x) +': '+ this.y + '%';
-                                }
-                                },
-								
-                                plotOptions: {
-                                series: {
-                                cursor: 'pointer',
-                                lineWidth: 1.0,
-                                point: {
-                                events: {
-                                click: function() {
-                                hs.htmlExpand(null, {
-                                              pageOrigin: {
-                                              x: this.pageX,
-                                              y: this.pageY
-                                              },
-                                              headingText: this.series.name,
-                                              maincontentText: Highcharts.dateFormat('%H:%M - %b %e, %Y', this.x) +':<br/> ',
-                                              width: 200
-                                              });
-                                }
-                                }
-                                },
-                                }
-                                },
-                                
-                                series: [{
-                                         name: 'Relative Humidity %',
-                                         marker: {
-											radius: 2
-                                         },
-                                         },
-										 {
-										 name: 'Temperature in C',
-										 color: '#FF00FF',
-										 marker: {
-											radius: 2
-										 },
-										 }]
-                                };
-                                
-                                
-                                // Load data asynchronously using jQuery. On success, add the data
-                                // to the options and initiate the chart.
-                                // http://api.jquery.com/jQuery.get/
-                                jQuery.get(dataFilePath, null, function(csv, state, xhr) {
-                                           var date, humidity, temperature, 
-                                           
-                                           // set up the two data series
-                                           humidityLevels = [];
-										   temperatureLevels = [];
-                                           
-                                           // inconsistency
-                                           if (typeof csv !== 'string') {
-                                           csv = xhr.responseText;
-                                           }
-                                           
-                                           // split the data return into lines and parse them
-                                           csv = csv.split(/\n/g);
-                                           jQuery.each(csv, function(i, line) {
-                                                       
-													   if (line.length == 0) {
-														  return true;
-													   }
-                                                       // all data lines start with a double quote
-                                                       line = line.split(',');
-                                                       date = parseInt(line[0], 10)*1000;
-													   humidity  = parseInt(line[1], 10);
-													   temperature = parseInt(line[2], 10);
-													   //filter
-													      if (humidity >=0 && humidity <= 100 ) {
-														   humidityLevels.push([
-																			 date,
-																			 humidity
-																			 ]);
-														  }
-														  if (temperature>=-20 && temperature <=80 ) {
-														   temperatureLevels.push([
-																			date,
-																			temperature
-																			]);
-														  }
-                                                       });
-                                           
-                                           options.series[0].data = humidityLevels;
-										   options.series[1].data = temperatureLevels;
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Arduino Humidity Data Logger!</title>
 
-                                           chart = new Highcharts.Chart(options);
-                                           });
-                                });
-    $('#chart-B').highcharts({
-        chart: {
-            type: 'line'
-        },
-        title: {
-            text: 'Chart B'
-        },
-        xAxis: {
-			type: 'datetime',
-			dateTimeLabelFormats : {
-				hour: '%I:%M %P',
-				minute: '%I %M'
-			},
-        },
-        yAxis: {
-            min: 0,
-            title: {
-                text: 'Miles during Run'
-            }
-        },
-        legend: {
-            enabled: false
-        },
-        credits: {
-            enabled: true,
-            text: 'You can have a link in here too',
-            href: 'http://www.google.com'
-        },
-        tooltip: {
-            shared: true
-        },
-        series: [{
-            name: 'Miles',
-            data: [2.4, 3.8, 6.1, 5.3, 4.1]
-            
-        }]
-    });								
-              });
-                </script>
-            </head>
-    <body>
-        <p style="text-align:center;">Please allow the chart to load, it may take up to 30 seconds </p>
-        <hr/>
-        <!--<script src="http://cdnjs.cloudflare.com/ajax/libs/highcharts/2.3.5/highcharts.js"></script> -->
-		<script src="http://github.highcharts.com/highcharts.js"></script>
-        
-        <!-- Additional files for the Highslide popup effect -->
-        <script type="text/javascript" src="http://www.highcharts.com/highslide/highslide-full.min.js"></script>
-        <script type="text/javascript" src="http://www.highcharts.com/highslide/highslide.config.js" charset="utf-8"></script>
-        <link rel="stylesheet" type="text/css" href="http://www.highcharts.com/highslide/highslide.css" />
-        
-        <div id="container" style="min-width: 400px; max-width:1440px; height: 400px; margin: 0 auto"></div>
-		<div class="spacer"></div>
-		<div id="chart-B" class="chart" style="min-width: 400px; max-width: 400px;; height: 400px; margin: 0 align="left" ></div> 
-        
-    </body>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+    <script type="text/javascript" src="ar_hc.js"></script>
+</head>
+
+<body>
+	<p style="text-align:center;">Please allow the chart to load, it may take up to 30 seconds</p>
+	<hr/>
+	<!--<script src="http://cdnjs.cloudflare.com/ajax/libs/highcharts/2.3.5/highcharts.js"></script> -->
+	<script src="http://github.highcharts.com/highcharts.js"></script>
+	<script type="text/javascript" src="http://code.highcharts.com/highcharts-more.js"></script>
+
+	<!-- Additional files for the Highslide popup effect -->
+	<script type="text/javascript" src="http://www.highcharts.com/highslide/highslide-full.min.js"></script>
+	<script type="text/javascript" src="http://www.highcharts.com/highslide/highslide.config.js" charset="utf-8"></script>
+	<link rel="stylesheet" type="text/css" href="http://www.highcharts.com/highslide/highslide.css" />
+
+	<div id="container" style="min-width: 400px; max-width:1440px; height: 400px; margin: 0 auto"></div>
+	<div class="spacer"></div>
+	<div id="current" style="width: 800px; height: 400px; margin: auto">
+		<div id="currentHumidity_div" style="width: 400px; height: 400px; margin: 0; float: left;"></div>
+		<div id="currentTemperature_div" style="width: 400px; height: 400px; margin: 0; float: left;"></div>
+	</div>
+</body>
 </html>
