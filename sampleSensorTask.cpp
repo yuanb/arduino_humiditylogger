@@ -11,7 +11,7 @@
 
 /*** DATA LOGGER AND TIMER CONTROLS ****/
 #define HIH4030_Pin  A0
-#define MEASURE_INTERVAL 600000     //10 minute intervals between measurements (in ms)
+#define MEASURE_INTERVAL 6000     //10 minute intervals between measurements (in ms)
 /* DS1820 address */
 byte T_SENSOR[8] = {0x10, 0x8F, 0x43, 0x37, 0x00, 0x08, 0x00, 0x2A};
 

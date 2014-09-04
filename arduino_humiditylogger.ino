@@ -15,8 +15,8 @@
 
 #define FILE_INTERVAL 604800        //One week worth of seconds
 
-OneWire  ONE_WIRE_BUS(2);  // Bus One-Wire (sonda DS18S20) sul pin 10
-configuration config;               //Actually make our config struct
+OneWire  ONE_WIRE_BUS(2);  // Bus One-Wire (sonda DS18S20) pin D2
+configuration config;      //Actually make our config struct
 
 void setup() {    
   // Open serial communications and wait for port to open:
